@@ -13,10 +13,11 @@ app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.json.compact = False
 
+# Initialize db with app
+db.init_app(app)
 migrate = Migrate(app, db)
 
-db.init_app(app)
-
+# Initialize Flask-RESTful API
 api = Api(app)
 
 
@@ -24,52 +25,72 @@ api = Api(app)
 def index():
     return "<h1>Code challenge</h1>"
 
+
 class Restaurants(Resource):
+    """GET /restaurants - Returns all restaurants without nested data"""
+    
     def get(self):
         restaurants = Restaurant.query.all()
-        return [restaurant.to_dict(rules=('-restaurant_pizzas',)) for restaurant in restaurants]
+        # Exclude restaurant_pizzas from serialization
+        return [restaurant.to_dict(only=('id', 'name', 'address')) for restaurant in restaurants], 200
+
 
 class RestaurantById(Resource):
+    """GET and DELETE /restaurants/<int:id>"""
+    
     def get(self, id):
-        restaurant = Restaurant.query.get(id)
-        if restaurant:
-            return restaurant.to_dict()
-        return {'error': 'Restaurant not found'}, 404
+        """Returns a single restaurant with nested restaurant_pizzas and pizza data"""
+        restaurant = Restaurant.query.filter_by(id=id).first()
+        
+        if not restaurant:
+            return {'error': 'Restaurant not found'}, 404
+        
+        # Include nested data: restaurant_pizzas with pizza details
+        return restaurant.to_dict(), 200
     
     def delete(self, id):
-        restaurant = Restaurant.query.get(id)
-        if restaurant:
-            db.session.delete(restaurant)
-            db.session.commit()
-            return '', 204
-        return {'error': 'Restaurant not found'}, 404
+        """Deletes a restaurant and cascades to delete associated restaurant_pizzas"""
+        restaurant = Restaurant.query.filter_by(id=id).first()
+        
+        if not restaurant:
+            return {'error': 'Restaurant not found'}, 404
+        
+        db.session.delete(restaurant)
+        db.session.commit()
+        
+        # Return empty body with 204 No Content
+        return '', 204
+
 
 class Pizzas(Resource):
+    """GET /pizzas - Returns all pizzas without nested data"""
+    
     def get(self):
         pizzas = Pizza.query.all()
-        return [pizza.to_dict(rules=('-restaurant_pizzas',)) for pizza in pizzas]
+        # Exclude restaurant_pizzas from serialization
+        return [pizza.to_dict(only=('id', 'name', 'ingredients')) for pizza in pizzas], 200
 
-class RestaurantPizzasResource(Resource):
+
+class RestaurantPizzas(Resource):
+    """POST /restaurant_pizzas - Creates a new RestaurantPizza"""
+    
     def post(self):
         try:
             data = request.get_json()
             
+            # Validate that data exists
             if not data:
                 return {'errors': ['validation errors']}, 400
-                
+            
             # Validate required fields
             required_fields = ['price', 'pizza_id', 'restaurant_id']
             if not all(field in data for field in required_fields):
                 return {'errors': ['validation errors']}, 400
             
-            # Validate price before creating object
-            price = data.get('price')
-            if price is None or not (1 <= price <= 30):
-                return {'errors': ['validation errors']}, 400
-            
-            # Create new RestaurantPizza - will also trigger validation
+            # Create new RestaurantPizza
+            # The @validates decorator will handle price validation
             restaurant_pizza = RestaurantPizza(
-                price=price,
+                price=data['price'],
                 pizza_id=data['pizza_id'],
                 restaurant_id=data['restaurant_id']
             )
@@ -77,18 +98,25 @@ class RestaurantPizzasResource(Resource):
             db.session.add(restaurant_pizza)
             db.session.commit()
             
-            # Return the created RestaurantPizza with nested data
+            # Return the created RestaurantPizza with nested restaurant and pizza data
             return restaurant_pizza.to_dict(), 201
             
-        except Exception as e:
+        except ValueError as e:
+            # Catch validation errors from @validates
             db.session.rollback()
-            # Return generic validation error for any exception
+            return {'errors': ['validation errors']}, 400
+        except Exception as e:
+            # Catch any other errors (e.g., foreign key constraints)
+            db.session.rollback()
             return {'errors': ['validation errors']}, 400
 
+
+# Register resources with their routes
 api.add_resource(Restaurants, '/restaurants')
 api.add_resource(RestaurantById, '/restaurants/<int:id>')
 api.add_resource(Pizzas, '/pizzas')
-api.add_resource(RestaurantPizzasResource, '/restaurant_pizzas')
+api.add_resource(RestaurantPizzas, '/restaurant_pizzas')
+
 
 if __name__ == "__main__":
     app.run(port=5555, debug=True)
