@@ -20,21 +20,21 @@ class Restaurant(db.Model, SerializerMixin):
     name = db.Column(db.String)
     address = db.Column(db.String)
 
-    # Relationship with cascade delete
+ 
     restaurant_pizzas = db.relationship(
         'RestaurantPizza', 
         back_populates='restaurant', 
         cascade='all, delete-orphan'
     )
     
-    # Association proxy for convenience
+  
     pizzas = association_proxy(
         'restaurant_pizzas', 
         'pizza',
         creator=lambda pizza_obj: RestaurantPizza(pizza=pizza_obj)
     )
 
-    # Serialization rules to prevent infinite recursion
+    # Serialization 
     serialize_rules = ('-restaurant_pizzas.restaurant',)
 
     def __repr__(self):
@@ -48,21 +48,21 @@ class Pizza(db.Model, SerializerMixin):
     name = db.Column(db.String)
     ingredients = db.Column(db.String)
 
-    # Relationship with cascade delete
+ 
     restaurant_pizzas = db.relationship(
         'RestaurantPizza', 
         back_populates='pizza', 
         cascade='all, delete-orphan'
     )
     
-    # Association proxy for convenience
+ 
     restaurants = association_proxy(
         'restaurant_pizzas', 
         'restaurant',
         creator=lambda restaurant_obj: RestaurantPizza(restaurant=restaurant_obj)
     )
 
-    # Serialization rules to prevent infinite recursion
+    # Serialization 
     serialize_rules = ('-restaurant_pizzas.pizza',)
 
     def __repr__(self):
@@ -81,7 +81,7 @@ class RestaurantPizza(db.Model, SerializerMixin):
     restaurant = db.relationship('Restaurant', back_populates='restaurant_pizzas')
     pizza = db.relationship('Pizza', back_populates='restaurant_pizzas')
 
-    # Serialization rules to prevent infinite recursion
+    
     serialize_rules = ('-restaurant.restaurant_pizzas', '-pizza.restaurant_pizzas')
 
     # Validation: price must be between 1 and 30

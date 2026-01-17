@@ -31,7 +31,6 @@ class Restaurants(Resource):
     
     def get(self):
         restaurants = Restaurant.query.all()
-        # Exclude restaurant_pizzas from serialization
         return [restaurant.to_dict(only=('id', 'name', 'address')) for restaurant in restaurants], 200
 
 
@@ -45,7 +44,7 @@ class RestaurantById(Resource):
         if not restaurant:
             return {'error': 'Restaurant not found'}, 404
         
-        # Include nested data: restaurant_pizzas with pizza details
+    
         return restaurant.to_dict(), 200
     
     def delete(self, id):
@@ -58,7 +57,7 @@ class RestaurantById(Resource):
         db.session.delete(restaurant)
         db.session.commit()
         
-        # Return empty body with 204 No Content
+    
         return '', 204
 
 
@@ -67,7 +66,7 @@ class Pizzas(Resource):
     
     def get(self):
         pizzas = Pizza.query.all()
-        # Exclude restaurant_pizzas from serialization
+        
         return [pizza.to_dict(only=('id', 'name', 'ingredients')) for pizza in pizzas], 200
 
 
@@ -88,7 +87,7 @@ class RestaurantPizzas(Resource):
                 return {'errors': ['validation errors']}, 400
             
             # Create new RestaurantPizza
-            # The @validates decorator will handle price validation
+            
             restaurant_pizza = RestaurantPizza(
                 price=data['price'],
                 pizza_id=data['pizza_id'],
@@ -102,11 +101,11 @@ class RestaurantPizzas(Resource):
             return restaurant_pizza.to_dict(), 201
             
         except ValueError as e:
-            # Catch validation errors from @validates
+          
             db.session.rollback()
             return {'errors': ['validation errors']}, 400
         except Exception as e:
-            # Catch any other errors (e.g., foreign key constraints)
+            
             db.session.rollback()
             return {'errors': ['validation errors']}, 400
 
